@@ -1,34 +1,232 @@
-# Gradle files
-.gradle/
-build/
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadísticas del Test de Autoconcepto</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px;}
+        h1, h2 { color: #2c3e50; margin-bottom: 20px; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        #stats-chart { max-height: 400px; }
+        .back-button { 
+            display: block; 
+            width: 200px; 
+            margin: 20px auto; 
+            padding: 10px 15px; 
+            background-color: #3498db; 
+            color: white; 
+            text-align: center; 
+            border-radius: 5px; 
+            text-decoration: none; 
+            font-size: 16px;
+        }
+        .back-button:hover { background-color: #2980b9; }
+        .no-data-message { text-align: center; color: #555; margin-top: 20px; }
 
-# Local configuration file (sdk path, etc)
-local.properties
+        /* Estilos para el nivel de autoestima global */
+        .global-self-esteem-section {
+            background-color: #e8f5e9; /* Un fondo suave para esta sección */
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            border: 1px solid #c8e6c9;
+            text-align: center;
+        }
+        .global-self-esteem-section h2 {
+            color: #388e3c; /* Color más verde para la auto-estima */
+            margin-bottom: 15px;
+        }
+        .global-self-esteem-level {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #1b5e20;
+            margin-bottom: 10px;
+        }
+        .global-self-esteem-interpretation {
+            font-size: 1.1em;
+            color: #4caf50;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Estadísticas del Test de Autoconcepto</h1>
+        
+        <div class="global-self-esteem-section">
+            <h2>Nivel Global de Autoestima de la Comunidad</h2>
+            <div id="global-self-esteem-level" class="global-self-esteem-level">Cargando...</div>
+            <div id="global-self-esteem-interpretation" class="global-self-esteem-interpretation"></div>
+            <p style="margin-top: 15px; font-size: 0.9em; color: #666;">(Basado en el promedio de todas las categorías y participantes)</p>
+        </div>
 
-# Log/OS Files
-*.log
+        <div class="stats-section">
+            <h2>Nivel de Autoestima por Categoría y Edad</h2>
+            <div class="form-group">
+                <label for="age-range">Filtrar por rango de edad:</label>
+                <select id="age-range" onchange="updateStats()">
+                    <option value="all">Todas las edades (12-25)</option>
+                    <option value="12-17">12-17 años</option>
+                    <option value="18-25">18-25 años</option>
+                </select>
+            </div>
+            <div class="chart-container">
+                <canvas id="stats-chart"></canvas>
+                <div id="no-stats-data" class="no-data-message" style="display:none;">
+                    No hay suficientes datos para mostrar estadísticas en este rango de edad. ¡Sé el primero en participar!
+                </div>
+            </div>
+            <div id="category-interpretations" style="margin-top: 20px;">
+                <!-- Interpretaciones por categoría se insertarán aquí -->
+            </div>
+        </div>
 
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
-*.apk
-output-metadata.json
+        <a href="index.html" class="back-button">Volver al Test</a>
+    </div>
 
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const testData = [
+            { category: "Autoconcepto Físico" }, 
+            { category: "Autoconcepto Moral" },
+            { category: "Autoconcepto Personal" }
+        ];
 
-# Keystore files
-*.jks
-*.keystore
+        let myChart; // Variable global para la instancia del gráfico
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStats(); // Cargar las estadísticas al inicio
+        });
 
-# Android Profiling
-*.hprof
+        // Función para obtener la interpretación de un score
+        function getInterpretation(score) {
+            if (score >= 13) return { level: "Muy Positivo", text: "Indica una percepción muy fuerte y satisfactoria en esta área. Hay un alto nivel de confianza y bienestar." };
+            if (score >= 9) return { level: "Moderado", text: "Muestra un autoconcepto equilibrado, con aspectos positivos y algunas áreas que podrían beneficiarse de mayor reflexión o desarrollo." };
+            return { level: "Bajo", text: "Sugiere una visión negativa o dificultades en esta área. Puede ser una fuente de malestar y una oportunidad para trabajar en el fortalecimiento personal." };
+        }
+
+        // Actualizar estadísticas y nivel de autoestima
+        function updateStats() {
+            const ageRange = document.getElementById('age-range').value;
+            const stored = JSON.parse(localStorage.getItem('testResultsHistory')) || {};
+            
+            let filteredResults = [];
+            Object.keys(stored).forEach(age => {
+                const ageNum = parseInt(age);
+                if (ageRange === 'all' || 
+                    (ageRange === '12-17' && ageNum >= 12 && ageNum <= 17) ||
+                    (ageRange === '18-25' && ageNum >= 18 && ageNum <= 25)) {
+                    
+                    stored[age].forEach(result => filteredResults.push(result));
+                }
+            });
+
+            // Calcular promedios por categoría
+            let averages = {};
+            testData.forEach(cat => averages[cat.category] = 0); 
+            
+            const noDataMessage = document.getElementById('no-stats-data');
+            const chartCanvas = document.getElementById('stats-chart');
+            const globalSelfEsteemLevelDiv = document.getElementById('global-self-esteem-level');
+            const globalSelfEsteemInterpretationDiv = document.getElementById('global-self-esteem-interpretation');
+            const categoryInterpretationsDiv = document.getElementById('category-interpretations');
+
+
+            if (filteredResults.length > 0) {
+                noDataMessage.style.display = 'none';
+                chartCanvas.style.display = 'block';
+
+                let totalGlobalScore = 0;
+                let totalCategoriesCount = 0;
+
+                testData.forEach(cat => {
+                    let sum = 0;
+                    filteredResults.forEach(result => sum += result[cat.category]);
+                    averages[cat.category] = sum / filteredResults.length;
+                    totalGlobalScore += averages[cat.category];
+                    totalCategoriesCount++;
+                });
+
+                // Calcular Nivel Global de Autoestima
+                const globalAverageScore = totalGlobalScore / totalCategoriesCount;
+                const globalInterpretation = getInterpretation(globalAverageScore);
+                globalSelfEsteemLevelDiv.textContent = `Nivel ${globalInterpretation.level}`;
+                globalSelfEsteemInterpretationDiv.textContent = globalInterpretation.text;
+
+                // Crear o actualizar gráfico
+                const ctx = chartCanvas.getContext('2d');
+                if (myChart) myChart.destroy(); 
+                
+                myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: testData.map(cat => cat.category),
+                        datasets: [{
+                            label: 'Puntuación Promedio',
+                            data: testData.map(cat => averages[cat.category]),
+                            backgroundColor: ['#3498db', '#2ecc71', '#e74c3c'],
+                            borderColor: ['#3498db', '#2ecc71', '#e74c3c'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { 
+                                beginAtZero: true, 
+                                max: 16, 
+                                title: {
+                                    display: true,
+                                    text: 'Puntuación Promedio'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Categoría de Autoconcepto'
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '/16';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Mostrar interpretaciones por categoría
+                let categoryInterpHtml = '<h3>Interpretación por Categoría</h3>';
+                testData.forEach(cat => {
+                    const score = averages[cat.category];
+                    const interpretation = getInterpretation(score);
+                    categoryInterpHtml += `
+                        <p><strong>${cat.category}:</strong> Promedio de ${score.toFixed(2)}/16 (${interpretation.level}). ${interpretation.text}</p>
+                    `;
+                });
+                categoryInterpretationsDiv.innerHTML = categoryInterpHtml;
+
+            } else {
+                // Si no hay datos, ocultar el gráfico y mostrar el mensaje
+                chartCanvas.style.display = 'none';
+                noDataMessage.style.display = 'block';
+                if (myChart) myChart.destroy(); 
+
+                globalSelfEsteemLevelDiv.textContent = 'No hay datos';
+                globalSelfEsteemInterpretationDiv.textContent = 'Participa en el test para ver las estadísticas de la comunidad.';
+                categoryInterpretationsDiv.innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>
